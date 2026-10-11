@@ -8,7 +8,7 @@
 ---
 
 ## 1. Project Overview
-This project develops a simplified version of the UNIX `ls(1)` utility from scratch on NetBSD 10.1, fully conforming to the project specification and manual page requirements.
+This project implements a simplified version of the UNIX `ls(1)` utility from scratch on NetBSD 10.1, fully conforming to the project specification and manual page requirements.
 
 ## 2. Implemented Features & Options
 The utility implements the synopsis `ls [-AacdFfhiklnqRrSstuw] [file ...]`:
