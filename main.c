@@ -1,6 +1,6 @@
 #include "ls.h"
 
-extern void set_cmp_flags(unsigned int flags);
+int g_exit_status = 0;
 
 int
 main(int argc, char *argv[])
@@ -8,92 +8,41 @@ main(int argc, char *argv[])
     unsigned int flags = 0;
     int ch;
 
-    /* Mc nh terminal bt -q */
     if (isatty(STDOUT_FILENO)) {
         flags |= FLAG_q;
     } else {
         flags |= FLAG_w;
     }
 
-    /* Super-user mc nh bt -A theo man page */
     if (geteuid() == 0) {
         flags |= FLAG_A;
     }
 
     while ((ch = getopt(argc, argv, "AacdFfhiklnqRrSstuw")) != -1) {
         switch (ch) {
-        case 'A':
-            flags |= FLAG_A;
-            break;
-        case 'a':
-            flags |= FLAG_a;
-            break;
-        case 'c':
-            flags &= ~FLAG_u;
-            flags |= FLAG_c;
-            break;
-        case 'd':
-            flags &= ~FLAG_R;
-            flags |= FLAG_d;
-            break;
-        case 'F':
-            flags |= FLAG_F;
-            break;
+        case 'A': flags |= FLAG_A; break;
+        case 'a': flags |= FLAG_a; break;
+        case 'c': flags &= ~FLAG_u; flags |= FLAG_c; break;
+        case 'd': flags &= ~FLAG_R; flags |= FLAG_d; break;
+        case 'F': flags |= FLAG_F; break;
         case 'f':
             flags |= FLAG_f;
             flags |= FLAG_a;
             flags &= ~(FLAG_t | FLAG_S | FLAG_r);
             break;
-        case 'h':
-            flags &= ~FLAG_k;
-            flags |= FLAG_h;
-            break;
-        case 'i':
-            flags |= FLAG_i;
-            break;
-        case 'k':
-            flags &= ~FLAG_h;
-            flags |= FLAG_k;
-            break;
-        case 'l':
-            flags &= ~FLAG_n;
-            flags |= FLAG_l;
-            break;
-        case 'n':
-            flags &= ~FLAG_l;
-            flags |= FLAG_n;
-            flags |= FLAG_l; /* -n k tha nh dng di ca -l */
-            break;
-        case 'q':
-            flags &= ~FLAG_w;
-            flags |= FLAG_q;
-            break;
-        case 'R':
-            flags &= ~FLAG_d;
-            flags |= FLAG_R;
-            break;
-        case 'r':
-            flags |= FLAG_r;
-            break;
-        case 'S':
-            flags &= ~FLAG_t;
-            flags |= FLAG_S;
-            break;
-        case 's':
-            flags |= FLAG_s;
-            break;
-        case 't':
-            flags &= ~FLAG_S;
-            flags |= FLAG_t;
-            break;
-        case 'u':
-            flags &= ~FLAG_c;
-            flags |= FLAG_u;
-            break;
-        case 'w':
-            flags &= ~FLAG_q;
-            flags |= FLAG_w;
-            break;
+        case 'h': flags &= ~FLAG_k; flags |= FLAG_h; break;
+        case 'i': flags |= FLAG_i; break;
+        case 'k': flags &= ~FLAG_h; flags |= FLAG_k; break;
+        case 'l': flags &= ~FLAG_n; flags |= FLAG_l; break;
+        case 'n': flags &= ~FLAG_l; flags |= (FLAG_n | FLAG_l); break;
+        case 'q': flags &= ~FLAG_w; flags |= FLAG_q; break;
+        case 'R': flags &= ~FLAG_d; flags |= FLAG_R; break;
+        case 'r': flags |= FLAG_r; break;
+        case 'S': flags &= ~FLAG_t; flags |= FLAG_S; break;
+        case 's': flags |= FLAG_s; break;
+        case 't': flags &= ~FLAG_S; flags |= FLAG_t; break;
+        case 'u': flags &= ~FLAG_c; flags |= FLAG_u; break;
+        case 'w': flags &= ~FLAG_q; flags |= FLAG_w; break;
         default:
             fprintf(stderr, "usage: ls [-AacdFfhiklnqRrSstuw] [file ...]\n");
             exit(EXIT_FAILURE);
@@ -103,14 +52,13 @@ main(int argc, char *argv[])
     argc -= optind;
     argv += optind;
 
-    /* Khng truyn tham s -> lit k th mc hin ti */
     if (argc == 0) {
         if (flags & FLAG_d) {
             FileEntry ent;
             ent.name = ".";
             ent.path = ".";
             if (lstat(".", &ent.sb) == -1) {
-                perror("ls: .");
+                fprintf(stderr, "ls: .: %s\n", strerror(errno));
                 return EXIT_FAILURE;
             }
             ent.error = 0;
@@ -118,10 +66,9 @@ main(int argc, char *argv[])
         } else {
             traverse_directory(".", flags, 0);
         }
-        return EXIT_SUCCESS;
+        return g_exit_status;
     }
 
-    /* Thu thp cc i s c truyn vo */
     FileEntry *files = malloc(argc * sizeof(FileEntry));
     FileEntry *dirs = malloc(argc * sizeof(FileEntry));
     size_t file_count = 0;
@@ -131,6 +78,7 @@ main(int argc, char *argv[])
         struct stat sb;
         if (lstat(argv[i], &sb) == -1) {
             fprintf(stderr, "ls: %s: %s\n", argv[i], strerror(errno));
+            g_exit_status = 1;
             continue;
         }
 
@@ -149,7 +97,6 @@ main(int argc, char *argv[])
         }
     }
 
-    /* Sp xp file v th mc ring bit nu khng bt -f */
     if (!(flags & FLAG_f)) {
         set_cmp_flags(flags);
         if (file_count > 0)
@@ -158,12 +105,10 @@ main(int argc, char *argv[])
             qsort(dirs, dir_count, sizeof(FileEntry), cmp_entries);
     }
 
-    /* In cc non-directory operand trc */
     if (file_count > 0) {
         print_entries(files, file_count, flags, 0);
     }
 
-    /* In cc directory operand sau */
     for (size_t i = 0; i < dir_count; i++) {
         if (file_count > 0 || dir_count > 1 || (flags & FLAG_R)) {
             if (i > 0 || file_count > 0)
@@ -176,5 +121,5 @@ main(int argc, char *argv[])
 
     free(files);
     free(dirs);
-    return EXIT_SUCCESS;
+    return g_exit_status;
 }
